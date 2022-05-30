@@ -17,6 +17,7 @@
 # along with TCP Proxy.  If not, see <http://www.gnu.org/licenses/>.          #
 ###############################################################################
 
+import os
 import argparse
 import pkg_resources
 import signal
@@ -38,13 +39,15 @@ def parseArg():
     """
     parser = argparse.ArgumentParser(description="TCP proxy.")
 
-    parser.add_argument("upHost",
+    parser.add_argument("--upHost",
                         help="the host of the upstream server for the proxy.",
-                        metavar="upstream-host")
-    parser.add_argument("upPort",
+                        metavar="upstream-host",
+                        default=os.getenv('REMOTE_HOST', '127.0.0.1'))
+    parser.add_argument("--upPort",
                         type=int,
                         help="the port of the upstream server for the proxy.",
-                        metavar="upstream-port")
+                        metavar="upstream-port",
+                        default=5060)
 
     parser.add_argument("-H",
                         "--host",
@@ -54,7 +57,7 @@ def parseArg():
                         dest="downHost")
     parser.add_argument("-p",
                         "--port",
-                        default=5354,
+                        default=5060,
                         type=int,
                         help="the port of the downstream server for the proxy, default is 5354.",
                         metavar="downstream-port",
@@ -73,7 +76,7 @@ def parseArg():
     parser.add_argument("-v",
                         "--version",
                         action="version",
-                        version="%(prog)s {}".format(pkg_resources.require("tcp-proxy")[0].version))
+                        version="%(prog)s {}".format(pkg_resources.require("sip-proxy")[0].version))
 
     return parser.parse_args()
 

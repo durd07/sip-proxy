@@ -16,13 +16,15 @@
 # You should have received a copy of the GNU General Public License           #
 # along with TCP Proxy.  If not, see <http://www.gnu.org/licenses/>.          #
 ###############################################################################
-
+import os
 from threading import Thread
 
 import socket
 
 from . import logger
 from .select_model import createSelection
+
+from . import sip
 
 
 class Proxy(Thread):
@@ -56,6 +58,7 @@ class Proxy(Thread):
         # Create downstream socket.
         self.downSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
+            self.downSock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.downSock.bind((downHost, downPort))
             self.downSock.listen(5)
             self.select.addConnection(self.downSock)
@@ -75,21 +78,24 @@ class Proxy(Thread):
             # Loop for the active connections.
             for fd in self.select.loop():
                 if fd == self.downSock.fileno():
-                    # Create connection.
-                    conn, _ = self.downSock.accept()
-                    connFd = conn.fileno()
+                    try:
+                        # Create connection.
+                        conn, _ = self.downSock.accept()
+                        connFd = conn.fileno()
 
-                    upSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    upSock.connect((self.upHost, self.upPort))
-                    upSockFd = upSock.fileno()
+                        upSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                        upSock.connect((self.upHost, self.upPort))
+                        upSockFd = upSock.fileno()
 
-                    self.select.addConnection(conn)
-                    self.connection[connFd] = (conn, upSockFd)
+                        self.select.addConnection(conn)
+                        self.connection[connFd] = (conn, upSockFd)
 
-                    self.select.addConnection(upSock)
-                    self.connection[upSockFd] = (upSock, connFd)
+                        self.select.addConnection(upSock)
+                        self.connection[upSockFd] = (upSock, connFd)
 
-                    logger.info("New connections - down ({}) <-> up ({}).".format(connFd, upSockFd))
+                        logger.info("New connections - down ({}) <-> up ({}).".format(connFd, upSockFd))
+                    except Exception as e:
+                        logger.error(f"Tunnel creation failed {e}")
                 else:
                     # Proxy data.
                     if fd in self.connection:
@@ -102,23 +108,30 @@ class Proxy(Thread):
                     else:
                         continue
 
-                    # Read data.
-                    data = readSock.recv(1024)
-                    if not data:
-                        # Disconnected.
-                        del self.connection[fd]
-                        self.select.removeConnection(readSock)
-                        readSock.close()
+                    try:
+                        # Read data.
+                        data = readSock.recv(4096)
+                        if not data:
+                            # Disconnected.
+                            del self.connection[fd]
+                            self.select.removeConnection(readSock)
+                            readSock.close()
 
-                        del self.connection[writeFd]
-                        self.select.removeConnection(writeSock)
-                        writeSock.close()
+                            del self.connection[writeFd]
+                            self.select.removeConnection(writeSock)
+                            writeSock.close()
 
-                        logger.info("Disconnected - ({}) <-> ({}).".format(fd, writeFd))
-                        continue
+                            logger.info("Disconnected - ({}) <-> ({}).".format(fd, writeFd))
+                            continue
 
-                    # Wrtie data.
-                    writeSock.sendall(data)
+                        sip_msg = sip.SipMessage(data.decode())
+                        if sip_msg.method:
+                            sip_msg.insert_header('Route', os.getenv("ROUTE_HEADER", ""))
+                        # Wrtie data.
+                        writeSock.sendall(sip_msg.stringify().encode())
+                        #writeSock.sendall(data)
+                    except Exception as e:
+                        logger.error(f"Tunnel data failed {e}")
 
         # Clean up all connections.
         for connection in self.connection:

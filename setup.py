@@ -33,17 +33,17 @@ with open("README.md", "w") as readme:
         readme.write(line)
 
 # Set up application.
-setup(name="tcp-proxy",
+setup(name="sip-proxy",
       version=__version__,
-      author="Aludirk Wong",
-      author_email="aludirkwong@gmail.com",
-      url="https://github.com/Aludirk/tcp-proxy",
-      description="TCP proxy.",
-      long_description=("A proxy server for TCP socket connections in Python 3, "
+      author="Felix Du",
+      author_email="durd07@gmail.com",
+      url="https://github.com/durd07/sip-proxy",
+      description="SIP proxy.",
+      long_description=("A proxy server for SIP socket connections in Python 3, "
                         "it supports the scalable I/O event, epoll and kqueue, for "
                         "high performance in large number of connections."),
       platforms=["Linux", "MacOS X"],
       license="GNU GPL v3 license",
       packages=find_packages("src"),
       package_dir={"": "src"},
-      entry_points={"console_scripts": ["tcp-proxy = proxy:main"]})
+      entry_points={"console_scripts": ["sip-proxy = proxy:main"]})
